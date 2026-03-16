@@ -183,14 +183,104 @@ with st.expander("Developer Debug Info"):
 st.divider()
 st.caption("Built by an AI that claims this code is production-ready.")
 
-# bugs observed
-# 1. new game works properly before winning/losing round
-# if you win or lose the first round
-# new game does not reset, continues to show results of first round
-# new answers are not submitted or updated in the history
-# 2. hint says go lower when the secret number is greater than the guess
-# <1 "go lower" 
-# >100 "go higher"
-# 3. switching easy/normal/hard does not display range changes
-# 4. readme states that every submission changes the secret number
-# that did not occur for me
+
+# --- tests ---
+
+# Bug 2: guess above secret should tell player to go lower
+def test_hint_go_lower_when_too_high():
+    _, message = check_guess(60, 50)
+    assert "LOWER" in message
+
+# Bug 2: guess below secret should tell player to go higher
+def test_hint_go_higher_when_too_low():
+    _, message = check_guess(40, 50)
+    assert "HIGHER" in message
+
+# Bug 2: outcome label is "Too High" when guess exceeds secret
+def test_outcome_too_high():
+    outcome, _ = check_guess(60, 50)
+    assert outcome == "Too High"
+
+# Bug 2: outcome label is "Too Low" when guess is under secret
+def test_outcome_too_low():
+    outcome, _ = check_guess(40, 50)
+    assert outcome == "Too Low"
+
+# Bug 2: exact match returns Win outcome
+def test_outcome_win():
+    outcome, _ = check_guess(50, 50)
+    assert outcome == "Win"
+
+# Bug 3: Easy difficulty returns range 1–20
+def test_easy_range():
+    low, high = get_range_for_difficulty("Easy")
+    assert low == 1 and high == 20
+
+# Bug 3: Normal difficulty returns range 1–100
+def test_normal_range():
+    low, high = get_range_for_difficulty("Normal")
+    assert low == 1 and high == 100
+
+# Bug 3: Hard difficulty returns range 1–50
+def test_hard_range():
+    low, high = get_range_for_difficulty("Hard")
+    assert low == 1 and high == 50
+
+# Scoring: even-numbered attempt with wrong guess subtracts points
+def test_too_high_even_attempt_subtracts():
+    score = update_score(100, "Too High", 2)
+    assert score == 95
+
+# Scoring: odd-numbered attempt with wrong guess also subtracts points
+def test_too_high_odd_attempt_subtracts():
+    score = update_score(100, "Too High", 3)
+    assert score == 95
+
+# Scoring: Too Low always subtracts points
+def test_too_low_subtracts():
+    score = update_score(100, "Too Low", 1)
+    assert score == 95
+
+# Scoring: winning adds points to score
+def test_win_adds_points():
+    score = update_score(0, "Win", 1)
+    assert score > 0
+
+# check_guess edge cases
+
+# Guess exactly 1 above secret is still Too High
+def test_guess_one_above_secret():
+    outcome, message = check_guess(51, 50)
+    assert outcome == "Too High" and "LOWER" in message
+
+# Guess exactly 1 below secret is still Too Low
+def test_guess_one_below_secret():
+    outcome, message = check_guess(49, 50)
+    assert outcome == "Too Low" and "HIGHER" in message
+
+# Secret at boundary value 1 can still be guessed correctly
+def test_guess_wins_at_boundary_low():
+    outcome, _ = check_guess(1, 1)
+    assert outcome == "Win"
+
+# Secret at boundary value 100 can still be guessed correctly
+def test_guess_wins_at_boundary_high():
+    outcome, _ = check_guess(100, 100)
+    assert outcome == "Win"
+
+# update_score edge cases
+
+# Win on attempt 1 gives full points (100 - 10 * 2 = 80)
+def test_win_attempt_1_score():
+    score = update_score(0, "Win", 1)
+    assert score == 80
+
+# Win on a late attempt floors at 10 points minimum
+def test_win_late_attempt_floor():
+    score = update_score(0, "Win", 20)
+    assert score == 10
+
+# Score can go negative after a wrong guess on a low score
+def test_score_goes_negative():
+    score = update_score(3, "Too Low", 1)
+    assert score == -2
