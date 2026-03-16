@@ -29,6 +29,9 @@ def parse_guess(raw: str):
     return True, value, None
 
 
+# Fix (Bug 2): I observed the hint was backwards — guessing too high showed "Go HIGHER"
+# and too low showed "Go LOWER". I reported this and Claude identified the swapped
+# return messages in check_guess and corrected them.
 def check_guess(guess, secret):
     if guess == secret:
         return "Win", "🎉 Correct!"
@@ -47,6 +50,9 @@ def check_guess(guess, secret):
         return "Too Low", "📈 Go HIGHER!"
 
 
+# Fix (Scoring bug): I noticed score was increasing on even attempts after a wrong guess.
+# Claude traced it to an even/odd condition in update_score that added 5 instead of
+# subtracting. We removed the condition so wrong guesses always subtract.
 def update_score(current_score: int, outcome: str, attempt_number: int):
     if outcome == "Win":
         points = 100 - 10 * (attempt_number + 1)
@@ -87,6 +93,8 @@ st.sidebar.caption(f"Attempts allowed: {attempt_limit}")
 if "secret" not in st.session_state:
     st.session_state.secret = random.randint(low, high)
 
+# Fix (attempts off-by-one): I noticed the attempt count was always 1 ahead of reality.
+# Claude found that attempts was initialized to 1 instead of 0 and corrected it.
 if "attempts" not in st.session_state:
     st.session_state.attempts = 0
 
@@ -101,6 +109,9 @@ if "history" not in st.session_state:
 
 st.subheader("Make a guess")
 
+# Fix (Bug 3): I observed the range shown to the player never changed when switching
+# difficulty. Claude found the info message had "1 and 100" hardcoded and replaced
+# it with the dynamic {low} and {high} variables.
 st.info(
     f"Guess a number between {low} and {high}. "
     f"Attempts left: {attempt_limit - st.session_state.attempts}"
@@ -119,6 +130,9 @@ with col2:
 with col3:
     show_hint = st.checkbox("Show hint", value=True)
 
+# Fix (Bug 1): I found that clicking New Game after winning or losing had no effect —
+# the game stayed frozen. Claude identified that status and history were never reset,
+# so the game hit st.stop() immediately. We added both resets to the new_game block.
 if new_game:
     st.session_state.attempts = 0
     st.session_state.secret = random.randint(low, high)
@@ -173,6 +187,9 @@ if submit:
                     f"Score: {st.session_state.score}"
                 )
 
+# Fix (debug info stale): I noticed the debug panel showed values from the previous
+# turn, not the current one. Claude explained that Streamlit renders top-to-bottom,
+# so the expander was rendering before submit logic ran. Moving it here fixes the order.
 with st.expander("Developer Debug Info"):
     st.write("Secret:", st.session_state.secret)
     st.write("Attempts:", st.session_state.attempts)
